@@ -7,17 +7,48 @@ skill that matches the file being edited.
 
 ## Install
 
-OpenCode discovers skills from `.opencode/skills/` in a project or
-`~/.config/opencode/skills/` globally. Clone this repository, then copy the skills
-into one of those locations:
+Add the hosted skill index to `~/.config/opencode/opencode.json` (or a project's
+`.opencode/opencode.json`):
 
-```sh
-mkdir -p .opencode/skills
-cp -R skills/* .opencode/skills/
+```json
+{
+  "skills": {
+    "urls": ["https://korsicheg.github.io/opencode-marketplace/skills/"]
+  }
+}
 ```
 
-Restart OpenCode after installing. The five skills appear in its native `skill`
-tool and are loaded only when relevant.
+Restart OpenCode. The five skills appear in its native `skill` tool and are loaded
+only when relevant.
+
+That is the whole install. OpenCode re-reads the index on every start and replaces
+any skill whose published version changed, so updates arrive on their own with
+nothing to reinstall.
+
+### Installing from a local clone
+
+Use this instead if you want to pin a revision, review changes before they take
+effect, work offline, or keep working during a GitHub Pages outage:
+
+```sh
+git clone https://github.com/korsicheg/opencode-marketplace.git
+```
+
+```json
+{
+  "skills": {
+    "paths": ["/absolute/path/to/opencode-marketplace/skills"]
+  }
+}
+```
+
+Update with `git pull` when you choose to. `skills.paths` and `skills.urls` can
+both be set; paths are read straight from disk and never fetched.
+
+> **Outage behaviour.** If `index.json` cannot be fetched, OpenCode registers no
+> skills from that URL — it does **not** fall back to its cached copy. A sustained
+> outage means the skills disappear until it recovers. The local-clone install is
+> immune to this.
 
 ## Skills
 
@@ -49,6 +80,9 @@ tool and are loaded only when relevant.
 ```text
 marketplace.json                          # Catalog metadata for installer clients
 NOTICE.md                                 # Sources, licences, and attribution
+scripts/build_index.py                    # Validates skills, generates index.json
+site/index.html                           # Landing page served at the Pages root
+.github/workflows/publish.yml             # Validate on PRs, publish on main
 skills/
 ├── clean-code-java/                      # SKILL.md + chapters/ + cheatsheet + glossary + patterns
 ├── clean-code-typescript/
@@ -60,3 +94,49 @@ skills/
 `marketplace.json` is a lightweight catalog manifest for installer clients. It is
 not an OpenCode built-in format: OpenCode currently has no native marketplace
 registration command.
+
+## Publishing
+
+`skills/index.json` is **not** committed. It is generated at deploy time from the
+contents of `skills/`, which keeps the checked-in tree the single source of truth
+and removes any chance of a stale index being merged.
+
+To publish, push to `main`. The workflow validates every skill, regenerates the
+index, and deploys to GitHub Pages. To check your work first:
+
+```sh
+pip install pyyaml
+python scripts/build_index.py --check          # validate, write nothing
+python scripts/build_index.py --out _site/skills # build the publishable tree
+```
+
+Validation rejects a skill that is missing `SKILL.md`, has unparseable
+frontmatter, is missing `name` or `description`, declares a `name` that disagrees
+with its directory, uses a directory name that is not lowercase-hyphenated, or
+contains a file path OpenCode would refuse to download. All failures are reported
+together rather than one at a time.
+
+### How updates reach users
+
+Each skill carries a `version` in the index that is a hash of **that skill's own
+files**. OpenCode stores it next to the cached copy as `.opencode-version` and
+re-downloads only when the two differ, so editing one skill updates that skill
+alone rather than churning all five for every user.
+
+Two consequences worth knowing:
+
+- **`version` is what makes updates work.** OpenCode skips downloading any file
+  already present in its cache; the version-triggered refresh is the only code
+  path that replaces existing content. Hand-writing an index without a `version`
+  would freeze every user at whatever they first downloaded.
+- **Nothing is verified beyond the version string.** Downloads are not checksummed
+  and the version is self-declared by the host, so the security boundary is
+  entirely "who can push to this repository and its Pages origin." Users who want
+  to review changes before they take effect should use the local-clone install.
+
+### First-time Pages setup
+
+In the repository settings, under **Pages**, set the source to **GitHub Actions**.
+The first push to `main` then publishes to
+`https://korsicheg.github.io/opencode-marketplace/`, with the skill index at
+`/skills/index.json`.

@@ -1,0 +1,82 @@
+name: Publish skills
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "skills/**"
+      - "scripts/build_index.py"
+      - "site/**"
+      - ".github/workflows/publish.yml"
+  pull_request:
+    paths:
+      - "skills/**"
+      - "scripts/build_index.py"
+      - "site/**"
+      - ".github/workflows/publish.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+defaults:
+  run:
+    # The runner default is `bash -e`, which does not set pipefail: a failure
+    # mid-pipe would stay invisible. This opts every `run:` block into
+    # `bash --noprofile --norc -eo pipefail`.
+    shell: bash
+
+jobs:
+  # Builds on pull requests too. `build_index.py` validates before it writes
+  # anything, so this job failing is what stops a malformed skill reaching the
+  # published index -- opencode drops every skill when index.json fails to
+  # parse, so one bad merge would take the whole set offline.
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned by commit sha because a tag is mutable and can be
+      # repointed by the publisher. The trailing comment carries the readable
+      # version; bump both together.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate skills and build site
+        run: |
+          python scripts/build_index.py --out _site/skills
+          cp site/index.html _site/index.html
+          touch _site/.nojekyll
+
+      - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: _site
+
+  # Split from `build` so that write access to Pages is scoped to a job that
+  # checks out no source and runs no project code.
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

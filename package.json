@@ -1,0 +1,21 @@
+{
+  "name": "clean-code",
+  "version": "1.1.0",
+  "description": "Clean Code gateway plugin for OpenCode: loads the language-matched clean-code skill before code is written",
+  "type": "module",
+  "main": ".opencode/plugins/clean-code.js",
+  "license": "SEE LICENSE IN NOTICE.md",
+  "author": "Alexandros Korsakov",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/korsicheg/opencode-marketplace.git"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "clean-code",
+    "skills",
+    "code-quality",
+    "code-review"
+  ]
+}

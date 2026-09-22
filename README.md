@@ -50,6 +50,44 @@ both be set; paths are read straight from disk and never fetched.
 > outage means the skills disappear until it recovers. The local-clone install is
 > immune to this.
 
+### Optional: the gateway plugin
+
+The skills above are loaded by OpenCode when it judges them relevant. In practice
+that judgement is the weak link -- a skill can sit listed and unread through a
+whole editing session, because nothing says *when* to load one.
+
+The gateway plugin fixes that by injecting a short rule at the start of each
+session: a file-extension-to-skill dispatch table, the load-before-you-write
+ordering, and a set of rebuttals to the usual reasons for skipping ("it's a
+one-line change", "I'm matching the surrounding style"). It is **opt-in and
+separate** -- a skill index cannot carry a plugin, so it needs its own line:
+
+```json
+{
+  "skills": {
+    "urls": ["https://korsicheg.github.io/opencode-marketplace/skills/"]
+  },
+  "plugin": ["clean-code@git+https://github.com/korsicheg/opencode-marketplace.git"]
+}
+```
+
+Pin a revision by appending a ref: `...opencode-marketplace.git#v1.1.0`.
+
+The plugin injects the rule and nothing else -- it does **not** register skills,
+so adding it cannot change which skills you have or how they update. Remove the
+`plugin` line to go back to skills alone.
+
+> **Caveat.** Injection uses OpenCode's `experimental.chat.messages.transform`
+> hook. The `experimental.` prefix is OpenCode's own: the API may change between
+> releases, and the skills install does not depend on it.
+>
+> **Updating.** Some OpenCode and Bun versions pin a resolved `git+https`
+> dependency in a lockfile or cache, so a restart may not pick up a newer commit.
+> Clear OpenCode's package cache or reinstall if an update does not appear.
+
+To edit the rule itself, change `.opencode/clean-code-gateway.md` -- the plugin
+only reads and wraps it.
+
 ## Skills
 
 - **`clean-code-java`**: The original book (Java examples): naming, functions,
@@ -79,10 +117,14 @@ both be set; paths are read straight from disk and never fetched.
 
 ```text
 marketplace.json                          # Catalog metadata for installer clients
+package.json                              # Plugin package manifest (opt-in gateway)
 NOTICE.md                                 # Sources, licences, and attribution
 scripts/build_index.py                    # Validates skills, generates index.json
 site/index.html                           # Landing page served at the Pages root
 .github/workflows/publish.yml             # Validate on PRs, publish on main
+.opencode/
+├── clean-code-gateway.md                 # The injected rule -- edit this
+└── plugins/clean-code.js                 # Opt-in gateway plugin (+ .test.js)
 skills/
 ├── clean-code-java/                      # SKILL.md + chapters/ + cheatsheet + glossary + patterns
 ├── clean-code-typescript/

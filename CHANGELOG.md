@@ -8,6 +8,51 @@ or capability, **patch** = content fix or doc change with no new surface.
 
 Sources and licensing for the shipped content are recorded in [NOTICE.md](NOTICE.md).
 
+## [1.1.0] — 2026-09-22
+
+### Added
+
+- **An opt-in gateway plugin** (`.opencode/`), so the family gets loaded rather than merely
+  being available. Five well-described skills were not enough on their own: OpenCode loads a
+  skill when it judges it relevant, and that judgement is the weak link — a skill sits listed
+  and unread through a whole editing session, because nothing says *when* to load one. The
+  plugin injects a short rule at the start of each session: a file-extension-to-skill
+  dispatch table, the load-before-you-write ordering, and rebuttals to the usual reasons for
+  skipping it ("it's a one-line change", "I'm matching the surrounding style", "I'm
+  reviewing, not writing").
+  - `.opencode/clean-code-gateway.md` — the rule, 367 words. **Edit this to change
+    behaviour;** the plugin only reads and wraps it.
+  - `.opencode/plugins/clean-code.js` — injects via `experimental.chat.messages.transform`,
+    into the first *user* message rather than a system one (OpenCode repeats system messages
+    every turn and several models break on more than one). Carries a marker-based
+    double-injection guard, and caches the rule at module level because the hook fires on
+    every agent **step**, not every turn.
+  - `.opencode/plugins/clean-code.test.js` — five tests, zero dependencies:
+    `node --test .opencode/plugins/clean-code.test.js`.
+  - `package.json` — the plugin package manifest, `main` pointing at the plugin.
+
+### Notes
+
+- **The skills are untouched, and so is their install.** A skill index cannot carry a
+  plugin, so the gateway needs its own `plugin` line in `opencode.json` alongside the
+  existing `skills.urls`. The Pages index, the per-skill version hashes and the documented
+  outage behaviour are all unchanged; no skill's version hash moves, so no user re-downloads
+  anything. Removing the `plugin` line returns you to skills alone.
+- **The plugin is gateway-only by design.** Unlike the `superpowers` plugin it is modelled
+  on, it does **not** push onto `config.skills.paths` — installing it therefore cannot change
+  which skills you have or how they update. One job, one reason to change.
+- **`experimental.chat.messages.transform` is experimental**, and the prefix is OpenCode's
+  own. The API may shift between releases. The skills install does not depend on it.
+- **Failure is reported, not swallowed.** An unreadable gateway logs once to stderr — visible
+  via `opencode run --print-logs` — naming the path and the underlying error, then no-ops;
+  silence would be indistinguishable from the plugin not having loaded. The once-only
+  logging matters because the hook runs on every agent step.
+- **Not wired into CI.** The publish workflow triggers on `skills/**`, `scripts/` and
+  `site/**`, so nothing here rebuilds the Pages index — correct, since no skill changed, but
+  it also means the tests are not run by the workflow. Note that Node's test runner skips
+  hidden directories, so `.opencode/` cannot be passed as a glob target; the file must be
+  named.
+
 ## [1.0.0] — 2026-09-21
 
 First release. Five skills, 82 files, ~16k lines.

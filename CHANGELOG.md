@@ -8,6 +8,44 @@ or capability, **patch** = content fix or doc change with no new surface.
 
 Sources and licensing for the shipped content are recorded in [NOTICE.md](NOTICE.md).
 
+## [2.0.0] — 2026-09-23
+
+OpenCode v2 only. Every install from 1.x has to change its configuration; no skill's
+content changes.
+
+### Changed
+
+- **Skills install from the repository, not from a hosted index.** OpenCode v2 clones this
+  repository as a hidden `references` entry and refreshes it at most once a day, and the
+  flat `skills` array loads the five skills from that checkout. v2 replaced the v1
+  `skills.urls` / `skills.paths` object with that array.
+- **The gateway plugin is ported to the v2 plugin API.** v1 plugins do not run in v2. It
+  now default-exports `{ id, setup }` and appends the rule to `event.system` in the
+  `session` `context` hook, which v2 runs before every agent-loop request. The v1
+  workarounds are gone with the reasons for them: v2 rebuilds the system parts for each
+  request, so the rule no longer rides on the first user message and needs no
+  double-injection guard. Still dependency-free — `Plugin.define` is an identity function,
+  so the definition is exported bare. `package.json` points at it through `exports`.
+- **`scripts/build_index.py` → `scripts/validate_skills.py`.** Validation only, against what
+  v2 needs: an id of at most 64 characters, `SKILL.md`, parseable frontmatter, a
+  `description`, and a `name` that — now optional, as in v2 — agrees with the directory
+  when present.
+- **The workflow validates instead of publishing**, and now runs the plugin tests too.
+
+### Removed
+
+- **GitHub Pages publishing**: the deploy job, the landing page (`site/`), the generated
+  `index.json` and its per-skill content hashes, and the download-path checks that existed
+  only for the HTTP index.
+- **The plugin's `experimental.chat.messages.transform` hook**, the v1 API.
+- **`marketplace.json`**, a catalog manifest no OpenCode version reads.
+
+### Fixed
+
+- **The plugin test no longer lives in `.opencode/plugins/`**, where v2 loads every file
+  as a plugin and logged a load failure for it on every start. It moved to `tests/`, which
+  also lets a bare `node --test` find it.
+
 ## [1.1.0] — 2026-09-22
 
 ### Added

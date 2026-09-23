@@ -1,0 +1,51 @@
+name: Validate
+
+# Users receive whatever lands on `main`: opencode refreshes its checkout of
+# this repository within a day of every push. These checks are what stop a
+# broken skill or plugin from reaching them.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # The runner default is `bash -e`, which does not set pipefail: a failure
+    # mid-pipe would stay invisible. This opts every `run:` block into
+    # `bash --noprofile --norc -eo pipefail`.
+    shell: bash
+
+jobs:
+  skills:
+    runs-on: ubuntu-latest
+    steps:
+      # Actions are pinned by commit sha because a tag is mutable and can be
+      # repointed by the publisher. The trailing comment carries the readable
+      # version; bump both together.
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install pyyaml
+
+      - name: Validate skills
+        run: python scripts/validate_skills.py
+
+  gateway-plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The runner image ships Node, and the tests have no dependencies.
+      - name: Test gateway plugin
+        run: node --test

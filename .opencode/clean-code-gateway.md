@@ -47,6 +47,6 @@ These thoughts mean STOP -- you are rationalizing:
 
 ## Precedence
 
-The project's own conventions win. Where an `AGENTS.md`, a `CLAUDE.md` or the
-user contradicts the skill, follow them -- and say which rule you set aside and
+The project's own conventions win. Where an `AGENTS.md` or the user
+contradicts the skill, follow them -- and say which rule you set aside and
 why.

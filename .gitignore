@@ -1,7 +1,3 @@
-# Generated at deploy time from the contents of skills/
-_site/
-skills/index.json
-
 # Python
 __pycache__/
 *.pyc

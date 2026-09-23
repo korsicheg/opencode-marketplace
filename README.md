@@ -5,30 +5,51 @@ chaptered reference with worked examples, a cheatsheet, a glossary, and a patter
 catalogue. The skill descriptions direct OpenCode to load the language-specific
 skill that matches the file being edited.
 
+Requires **OpenCode v2**. v1 is not supported: its `skills` configuration and
+plugin API both differ.
+
 ## Install
 
-Add the hosted skill index to `~/.config/opencode/opencode.json` (or a project's
+Add this to `~/.config/opencode/opencode.json` (or a project's
 `.opencode/opencode.json`):
 
 ```json
 {
-  "skills": {
-    "urls": ["https://korsicheg.github.io/opencode-marketplace/skills/"]
-  }
+  "references": {
+    "clean-code": {
+      "repository": "https://github.com/korsicheg/opencode-marketplace.git",
+      "branch": "main",
+      "hidden": true
+    }
+  },
+  "skills": ["~/.local/share/opencode/repos/github.com/korsicheg/opencode-marketplace@main/skills"]
 }
 ```
 
-Restart OpenCode. The five skills appear in its native `skill` tool and are loaded
-only when relevant.
+The `references` entry makes OpenCode clone this repository and keep it current;
+the `skills` entry loads the five skills from that checkout. `hidden` keeps the
+repository itself out of the model's list of references, so only the skills are
+used.
 
-That is the whole install. OpenCode re-reads the index on every start and replaces
-any skill whose published version changed, so updates arrive on their own with
-nothing to reinstall.
+- **First start.** The clone runs in the background, so the skills appear from the
+  next session onward.
+- **Updates.** OpenCode refreshes the checkout at most once a day -- a fetch and a
+  hard reset to `main` -- when references load and after each prompt. There is
+  nothing to reinstall.
+- **Private hosts.** The clone uses your existing Git credentials, so any
+  repository you can `git clone` non-interactively works. Credentials written into
+  the `repository` URL are stripped, so store them in a Git credential helper
+  instead.
+
+> **The checkout path is OpenCode's internal layout, not a documented contract.**
+> It is `<repos>/<host>/<owner>/<repo>@<branch>`, where `<repos>` is the `repos`
+> line of `opencode debug paths`. If the skills disappear after an OpenCode
+> upgrade, check that directory and update the `skills` entry to match.
 
 ### Installing from a local clone
 
-Use this instead if you want to pin a revision, review changes before they take
-effect, work offline, or keep working during a GitHub Pages outage:
+Use this instead if you want to pin a revision or review changes before they take
+effect:
 
 ```sh
 git clone https://github.com/korsicheg/opencode-marketplace.git
@@ -36,19 +57,11 @@ git clone https://github.com/korsicheg/opencode-marketplace.git
 
 ```json
 {
-  "skills": {
-    "paths": ["/absolute/path/to/opencode-marketplace/skills"]
-  }
+  "skills": ["/absolute/path/to/opencode-marketplace/skills"]
 }
 ```
 
-Update with `git pull` when you choose to. `skills.paths` and `skills.urls` can
-both be set; paths are read straight from disk and never fetched.
-
-> **Outage behaviour.** If `index.json` cannot be fetched, OpenCode registers no
-> skills from that URL — it does **not** fall back to its cached copy. A sustained
-> outage means the skills disappear until it recovers. The local-clone install is
-> immune to this.
+Update with `git pull` when you choose to.
 
 ### Optional: the gateway plugin
 
@@ -56,37 +69,28 @@ The skills above are loaded by OpenCode when it judges them relevant. In practic
 that judgement is the weak link -- a skill can sit listed and unread through a
 whole editing session, because nothing says *when* to load one.
 
-The gateway plugin fixes that by injecting a short rule at the start of each
-session: a file-extension-to-skill dispatch table, the load-before-you-write
-ordering, and a set of rebuttals to the usual reasons for skipping ("it's a
-one-line change", "I'm matching the surrounding style"). It is **opt-in and
-separate** -- a skill index cannot carry a plugin, so it needs its own line:
+The gateway plugin fixes that by adding a short rule to the system instructions of
+every agent request: a file-extension-to-skill dispatch table, the
+load-before-you-write ordering, and a set of rebuttals to the usual reasons for
+skipping ("it's a one-line change", "I'm matching the surrounding style"). It is
+**opt-in and separate**, so it needs its own line:
 
 ```json
 {
-  "skills": {
-    "urls": ["https://korsicheg.github.io/opencode-marketplace/skills/"]
-  },
-  "plugin": ["clean-code@git+https://github.com/korsicheg/opencode-marketplace.git"]
+  "plugins": ["github:korsicheg/opencode-marketplace"]
 }
 ```
 
-Pin a revision by appending a ref: `...opencode-marketplace.git#v1.1.0`.
+Pin a revision by appending a tag or commit: `github:korsicheg/opencode-marketplace#<ref>`.
+An unpinned plugin is checked for updates at startup but not upgraded in place;
+run `opencode plugin update` to apply one.
 
-The plugin injects the rule and nothing else -- it does **not** register skills,
-so adding it cannot change which skills you have or how they update. Remove the
-`plugin` line to go back to skills alone.
-
-> **Caveat.** Injection uses OpenCode's `experimental.chat.messages.transform`
-> hook. The `experimental.` prefix is OpenCode's own: the API may change between
-> releases, and the skills install does not depend on it.
->
-> **Updating.** Some OpenCode and Bun versions pin a resolved `git+https`
-> dependency in a lockfile or cache, so a restart may not pick up a newer commit.
-> Clear OpenCode's package cache or reinstall if an update does not appear.
+The plugin adds the rule and nothing else -- it does **not** register skills, so
+adding it cannot change which skills you have or how they update. Remove the
+`plugins` entry to go back to skills alone.
 
 To edit the rule itself, change `.opencode/clean-code-gateway.md` -- the plugin
-only reads and wraps it.
+only reads and appends it.
 
 ## Skills
 
@@ -109,6 +113,8 @@ only reads and wraps it.
   It distinguishes principles that apply everywhere from those requiring specific
   language constructs.
 
+Each skill is also available as a slash command, such as `/clean-code-python`.
+
 > **Sources and licensing differ per skill.** The three community adaptations are
 > MIT; the book-derived material is independently written restatement with
 > citations. Read [`NOTICE.md`](NOTICE.md) before redistributing.
@@ -116,15 +122,14 @@ only reads and wraps it.
 ## Layout
 
 ```text
-marketplace.json                          # Catalog metadata for installer clients
 package.json                              # Plugin package manifest (opt-in gateway)
 NOTICE.md                                 # Sources, licences, and attribution
-scripts/build_index.py                    # Validates skills, generates index.json
-site/index.html                           # Landing page served at the Pages root
-.github/workflows/publish.yml             # Validate on PRs, publish on main
+scripts/validate_skills.py                # Checks every skill loads as intended
+tests/clean-code.test.js                  # Gateway plugin tests
+.github/workflows/validate.yml            # Runs both checks on pushes and PRs
 .opencode/
 ├── clean-code-gateway.md                 # The injected rule -- edit this
-└── plugins/clean-code.js                 # Opt-in gateway plugin (+ .test.js)
+└── plugins/clean-code.js                 # Opt-in gateway plugin
 skills/
 ├── clean-code-java/                      # SKILL.md + chapters/ + cheatsheet + glossary + patterns
 ├── clean-code-typescript/
@@ -133,52 +138,23 @@ skills/
 └── clean-code-universal/                 # Includes declarative translation reference
 ```
 
-`marketplace.json` is a lightweight catalog manifest for installer clients. It is
-not an OpenCode built-in format: OpenCode currently has no native marketplace
-registration command.
+## Changing a skill
 
-## Publishing
-
-`skills/index.json` is **not** committed. It is generated at deploy time from the
-contents of `skills/`, which keeps the checked-in tree the single source of truth
-and removes any chance of a stale index being merged.
-
-To publish, push to `main`. The workflow validates every skill, regenerates the
-index, and deploys to GitHub Pages. To check your work first:
+Whatever lands on `main` reaches every user within a day, so check it first:
 
 ```sh
 pip install pyyaml
-python scripts/build_index.py --check          # validate, write nothing
-python scripts/build_index.py --out _site/skills # build the publishable tree
+python scripts/validate_skills.py   # every skill loads under the id and description you expect
+node --test                         # the gateway plugin
 ```
 
-Validation rejects a skill that is missing `SKILL.md`, has unparseable
-frontmatter, is missing `name` or `description`, declares a `name` that disagrees
-with its directory, uses a directory name that is not lowercase-hyphenated, or
-contains a file path OpenCode would refuse to download. All failures are reported
-together rather than one at a time.
+Validation rejects a skill whose directory name is not a lowercase-hyphenated id of
+at most 64 characters, that is missing `SKILL.md`, has missing or unparseable
+frontmatter, declares a `name` that disagrees with its directory, or has no
+`description` -- without one, OpenCode never offers the skill to the model. All
+failures are reported together rather than one at a time. The workflow runs both
+checks on every pull request and every push to `main`.
 
-### How updates reach users
-
-Each skill carries a `version` in the index that is a hash of **that skill's own
-files**. OpenCode stores it next to the cached copy as `.opencode-version` and
-re-downloads only when the two differ, so editing one skill updates that skill
-alone rather than churning all five for every user.
-
-Two consequences worth knowing:
-
-- **`version` is what makes updates work.** OpenCode skips downloading any file
-  already present in its cache; the version-triggered refresh is the only code
-  path that replaces existing content. Hand-writing an index without a `version`
-  would freeze every user at whatever they first downloaded.
-- **Nothing is verified beyond the version string.** Downloads are not checksummed
-  and the version is self-declared by the host, so the security boundary is
-  entirely "who can push to this repository and its Pages origin." Users who want
-  to review changes before they take effect should use the local-clone install.
-
-### First-time Pages setup
-
-In the repository settings, under **Pages**, set the source to **GitHub Actions**.
-The first push to `main` then publishes to
-`https://korsicheg.github.io/opencode-marketplace/`, with the skill index at
-`/skills/index.json`.
+Nothing is verified beyond Git itself: the security boundary is "who can push to
+`main`". Users who want to review changes before they take effect should use the
+local-clone install.

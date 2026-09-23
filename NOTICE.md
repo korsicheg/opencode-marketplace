@@ -130,7 +130,7 @@ SOFTWARE
 
 ## This repository
 
-The marketplace packaging — `marketplace.json`, this notice, the changelog, and
+The packaging — the gateway plugin, the validation tooling, this notice, the changelog, and
 the skill-authoring work that turned these sources into skills (chapter structure,
 cheatsheets, glossaries, pattern catalogues, the tier spine and declarative
 translation table in `clean-code-universal`) — is by Alexandros Korsakov and is
